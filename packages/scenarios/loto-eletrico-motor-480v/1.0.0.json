@@ -1,30 +1,395 @@
 {
   "scenarioId": "loto-eletrico-motor-480v",
   "version": "1.0.0",
-  "title": "LOTO Elétrico – Motor 480V com inversor",
-  "startNodeId": "n_intro",
+  "title": "LOTO Elétrico – Motor 480V com inversor (energia residual)",
+  "domain": "hazardous-energy-control",
+  "focus": [
+    "electrical",
+    "stored-energy",
+    "verification",
+    "human-factors"
+  ],
+  "estimatedMinutes": 6,
   "maturityModel": {
     "levels": [
-      { "id": "iniciante", "minScore": 0, "maxScore": 49 },
-      { "id": "experiente", "minScore": 50, "maxScore": 79 },
-      { "id": "sistemico", "minScore": 80, "maxScore": 100 }
+      {
+        "id": "iniciante",
+        "minScore": 0,
+        "maxScore": 49
+      },
+      {
+        "id": "experiente",
+        "minScore": 50,
+        "maxScore": 79
+      },
+      {
+        "id": "sistemico",
+        "minScore": 80,
+        "maxScore": 100
+      }
     ],
     "dimensions": [
-      { "id": "isolamento_positivo", "weight": 0.25 },
-      { "id": "verificacao_ausencia", "weight": 0.25 },
-      { "id": "energia_residual", "weight": 0.2 },
-      { "id": "pessoas_e_grupo", "weight": 0.15 },
-      { "id": "comunicacao_registro", "weight": 0.15 }
+      {
+        "id": "isolamento_positivo",
+        "weight": 0.25
+      },
+      {
+        "id": "verificacao_ausencia",
+        "weight": 0.25
+      },
+      {
+        "id": "energia_residual",
+        "weight": 0.2
+      },
+      {
+        "id": "pessoas_e_grupo",
+        "weight": 0.15
+      },
+      {
+        "id": "comunicacao_registro",
+        "weight": 0.15
+      }
     ],
-    "criticalFailRules": []
+    "criticalFailRules": [
+      {
+        "id": "cf_01",
+        "when": "choice",
+        "choiceId": "c_cmd_only",
+        "reason": "Controle por comando não é isolamento positivo."
+      },
+      {
+        "id": "cf_02",
+        "when": "choice",
+        "choiceId": "c_skip_verify",
+        "reason": "Trabalho sem teste de ausência de tensão."
+      },
+      {
+        "id": "cf_03",
+        "when": "choice",
+        "choiceId": "c_open_panel_now",
+        "reason": "Acesso ao painel sem verificação e sem controle de energia residual."
+      }
+    ]
   },
+  "context": {
+    "site": "Indústria (linha de produção contínua)",
+    "asset": "Motor + inversor de frequência",
+    "voltage": "480V",
+    "pressure": "Produção solicita retorno rápido",
+    "roles": [
+      "Authorized Employee",
+      "Affected Employee",
+      "Supervisor"
+    ]
+  },
+  "startNodeId": "n_intro",
   "nodes": [
     {
       "id": "n_intro",
+      "type": "info",
+      "title": "Situação",
+      "body": "Motor apresenta falha intermitente. Você precisa abrir o painel do inversor para inspeção corretiva. O equipamento está em operação e há pressão de prazo.",
+      "next": "n_identify_energy"
+    },
+    {
+      "id": "n_identify_energy",
+      "type": "decision",
+      "title": "Identificação de energia",
+      "body": "Quais fontes de energia devem ser consideradas antes da intervenção?",
+      "choices": [
+        {
+          "id": "c_only_electrical",
+          "label": "Apenas energia elétrica (AC) do painel",
+          "effects": {
+            "scoreDelta": {
+              "energia_residual": -10
+            },
+            "flags": [
+              "missed_stored_energy"
+            ]
+          },
+          "feedback": "Incompleto. Inversores podem manter energia armazenada (DC link/capacitores) após desligamento."
+        },
+        {
+          "id": "c_electrical_and_stored",
+          "label": "Energia elétrica + energia residual (capacitores/inércia)",
+          "effects": {
+            "scoreDelta": {
+              "energia_residual": 10
+            },
+            "flags": [
+              "recognized_stored_energy"
+            ]
+          },
+          "feedback": "Correto. Além da alimentação AC, considere energia armazenada (capacitores) e energia mecânica residual."
+        }
+      ],
+      "nextByChoice": {
+        "c_only_electrical": "n_select_isolation",
+        "c_electrical_and_stored": "n_select_isolation"
+      }
+    },
+    {
+      "id": "n_select_isolation",
+      "type": "decision",
+      "title": "Ponto de isolamento",
+      "body": "Qual método você usa para isolar a energia?",
+      "choices": [
+        {
+          "id": "c_cmd_only",
+          "label": "Parar pelo HMI/botão de comando e abrir o painel",
+          "effects": {
+            "criticalFail": "cf_01",
+            "scoreDelta": {
+              "isolamento_positivo": -30,
+              "verificacao_ausencia": -20,
+              "energia_residual": -10,
+              "comunicacao_registro": -5
+            }
+          },
+          "feedback": "Falha crítica: controle por comando não é isolamento positivo. Risco de reenergização inesperada."
+        },
+        {
+          "id": "c_interlock_door",
+          "label": "Confiar no intertravamento da porta do painel",
+          "effects": {
+            "scoreDelta": {
+              "isolamento_positivo": -15,
+              "verificacao_ausencia": -10,
+              "energia_residual": -5,
+              "comunicacao_registro": -5
+            },
+            "flags": [
+              "overreliance_interlock"
+            ]
+          },
+          "feedback": "Inadequado como método principal. Exige isolamento positivo e verificação."
+        },
+        {
+          "id": "c_disconnect_lock",
+          "label": "Isolar no seccionador/disjuntor principal bloqueável + cadeado pessoal + etiqueta",
+          "effects": {
+            "scoreDelta": {
+              "isolamento_positivo": 25,
+              "comunicacao_registro": 5
+            }
+          },
+          "feedback": "Correto. Isolamento positivo no dispositivo de seccionamento com bloqueio e identificação."
+        }
+      ],
+      "nextByChoice": {
+        "c_cmd_only": "n_outcome_fail",
+        "c_interlock_door": "n_verify_plan",
+        "c_disconnect_lock": "n_notify_affected"
+      }
+    },
+    {
+      "id": "n_notify_affected",
+      "type": "decision",
+      "title": "Notificação e controle de pessoas",
+      "body": "Há operadores na área. O que você faz?",
+      "choices": [
+        {
+          "id": "c_no_notify",
+          "label": "Não notificar; é intervenção rápida",
+          "effects": {
+            "scoreDelta": {
+              "comunicacao_registro": -15,
+              "pessoas_e_grupo": -5
+            }
+          },
+          "feedback": "Falha de comunicação. Pessoas afetadas podem tentar operar o equipamento."
+        },
+        {
+          "id": "c_notify",
+          "label": "Notificar afetados e sinalizar equipamento fora de operação",
+          "effects": {
+            "scoreDelta": {
+              "comunicacao_registro": 15,
+              "pessoas_e_grupo": 5
+            }
+          },
+          "feedback": "Correto. A comunicação reduz tentativas de operação e erros de coordenação."
+        }
+      ],
+      "nextByChoice": {
+        "c_no_notify": "n_apply_loto",
+        "c_notify": "n_apply_loto"
+      }
+    },
+    {
+      "id": "n_apply_loto",
+      "type": "decision",
+      "title": "Aplicação do LOTO",
+      "body": "Qual arranjo de bloqueio você aplica?",
+      "choices": [
+        {
+          "id": "c_shared_lock",
+          "label": "Um único cadeado do time (compartilhado)",
+          "effects": {
+            "scoreDelta": {
+              "pessoas_e_grupo": -20,
+              "comunicacao_registro": -5
+            }
+          },
+          "feedback": "Inadequado. Princípio: 1 pessoa / 1 cadeado / 1 chave."
+        },
+        {
+          "id": "c_personal_lock_tag",
+          "label": "Cadeado pessoal + etiqueta com identificação do aplicador",
+          "effects": {
+            "scoreDelta": {
+              "pessoas_e_grupo": 20,
+              "comunicacao_registro": 10
+            }
+          },
+          "feedback": "Correto. Bloqueio individual e identificação clara do responsável."
+        }
+      ],
+      "nextByChoice": {
+        "c_shared_lock": "n_verify_plan",
+        "c_personal_lock_tag": "n_verify_plan"
+      }
+    },
+    {
+      "id": "n_verify_plan",
+      "type": "decision",
+      "title": "Verificação e energia residual",
+      "body": "Antes de abrir o painel, qual sequência você executa?",
+      "choices": [
+        {
+          "id": "c_skip_verify",
+          "label": "Abrir painel e começar a inspeção; já está isolado",
+          "effects": {
+            "criticalFail": "cf_02",
+            "scoreDelta": {
+              "verificacao_ausencia": -30,
+              "energia_residual": -20
+            }
+          },
+          "feedback": "Falha crítica: intervenção sem teste de ausência de tensão e sem tratar energia residual."
+        },
+        {
+          "id": "c_test_immediately",
+          "label": "Testar ausência de tensão imediatamente e prosseguir",
+          "effects": {
+            "scoreDelta": {
+              "verificacao_ausencia": 10,
+              "energia_residual": -10
+            },
+            "flags": [
+              "ignored_discharge_time"
+            ]
+          },
+          "feedback": "Parcial. Inversores podem manter carga residual. Aguarde tempo técnico e/ou descarregue."
+        },
+        {
+          "id": "c_wait_discharge_test",
+          "label": "Aguardar descarga + descarregar conforme procedimento + testar ausência de tensão",
+          "effects": {
+            "scoreDelta": {
+              "verificacao_ausencia": 25,
+              "energia_residual": 25
+            }
+          },
+          "feedback": "Correto. Trata energia armazenada e confirma energia zero."
+        }
+      ],
+      "nextByChoice": {
+        "c_skip_verify": "n_outcome_fail",
+        "c_test_immediately": "n_open_panel",
+        "c_wait_discharge_test": "n_open_panel"
+      }
+    },
+    {
+      "id": "n_open_panel",
+      "type": "decision",
+      "title": "Abertura do painel",
+      "body": "Você abre o painel do inversor. Qual prática você segue?",
+      "choices": [
+        {
+          "id": "c_open_panel_now",
+          "label": "Tocar diretamente nos componentes para checar aquecimento/folgas",
+          "effects": {
+            "criticalFail": "cf_03",
+            "scoreDelta": {
+              "verificacao_ausencia": -20,
+              "energia_residual": -20
+            }
+          },
+          "feedback": "Falha crítica: contato com componentes sem garantir energia zero e práticas seguras."
+        },
+        {
+          "id": "c_safe_inspection",
+          "label": "Inspeção visual primeiro, seguindo práticas seguras",
+          "effects": {
+            "scoreDelta": {
+              "verificacao_ausencia": 10,
+              "energia_residual": 5
+            }
+          },
+          "feedback": "Adequado. Reduz exposição desnecessária."
+        }
+      ],
+      "nextByChoice": {
+        "c_open_panel_now": "n_outcome_fail",
+        "c_safe_inspection": "n_restore"
+      }
+    },
+    {
+      "id": "n_restore",
+      "type": "decision",
+      "title": "Reenergização e retorno",
+      "body": "Após concluir, como você faz a reinstalação e retorno?",
+      "choices": [
+        {
+          "id": "c_remove_loto_alone",
+          "label": "Remover LOTO e energizar sem comunicar operadores",
+          "effects": {
+            "scoreDelta": {
+              "comunicacao_registro": -15,
+              "pessoas_e_grupo": -5
+            }
+          },
+          "feedback": "Risco de surpresa operacional. Reenergização deve ser coordenada."
+        },
+        {
+          "id": "c_check_clear_notify_restore",
+          "label": "Confirmar área livre, comunicar afetados, remover LOTO pelo aplicador e reenergizar",
+          "effects": {
+            "scoreDelta": {
+              "comunicacao_registro": 15,
+              "pessoas_e_grupo": 5,
+              "isolamento_positivo": 5
+            }
+          },
+          "feedback": "Correto. Reenergização controlada e comunicação adequada."
+        }
+      ],
+      "nextByChoice": {
+        "c_remove_loto_alone": "n_outcome_complete",
+        "c_check_clear_notify_restore": "n_outcome_complete"
+      }
+    },
+    {
+      "id": "n_outcome_fail",
       "type": "outcome",
-      "title": "Cenário carregado",
-      "body": "Este é um cenário de teste inicial.",
-      "outcome": { "status": "COMPLETED", "severity": "NONE" }
+      "title": "Resultado: Falha de controle crítico",
+      "body": "Sessão terminou com falha crítica. Revise isolamento positivo, verificação e energia residual.",
+      "outcome": {
+        "status": "FAILED",
+        "severity": "CRITICAL_FAIL"
+      }
+    },
+    {
+      "id": "n_outcome_complete",
+      "type": "outcome",
+      "title": "Resultado: Sessão concluída",
+      "body": "Sessão concluída. O sistema calculará maturidade e oportunidades de melhoria.",
+      "outcome": {
+        "status": "COMPLETED",
+        "severity": "NONE"
+      }
     }
   ]
 }

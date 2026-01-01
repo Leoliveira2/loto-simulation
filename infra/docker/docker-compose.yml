@@ -8,3 +8,7 @@ services:
       POSTGRES_DB: loto
     ports:
       - "5432:5432"
+    volumes:
+      - loto_pg:/var/lib/postgresql/data
+volumes:
+  loto_pg:

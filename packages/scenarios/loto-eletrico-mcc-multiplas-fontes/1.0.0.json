@@ -1,0 +1,346 @@
+{
+  "scenarioId": "loto-eletrico-mcc-multiplas-fontes",
+  "version": "1.0.0",
+  "title": "LOTO Elétrico – Painel MCC com múltiplas fontes (rede + gerador + capacitores)",
+  "domain": "hazardous-energy-control",
+  "focus": [
+    "electrical",
+    "multiple-sources",
+    "backfeed",
+    "group-lockout",
+    "verification",
+    "systemic"
+  ],
+  "estimatedMinutes": 8,
+  "maturityModel": {
+    "levels": [
+      {
+        "id": "iniciante",
+        "minScore": 0,
+        "maxScore": 49
+      },
+      {
+        "id": "experiente",
+        "minScore": 50,
+        "maxScore": 79
+      },
+      {
+        "id": "sistemico",
+        "minScore": 80,
+        "maxScore": 100
+      }
+    ],
+    "dimensions": [
+      {
+        "id": "isolamento_positivo",
+        "weight": 0.25
+      },
+      {
+        "id": "verificacao_ausencia",
+        "weight": 0.25
+      },
+      {
+        "id": "energia_residual",
+        "weight": 0.2
+      },
+      {
+        "id": "pessoas_e_grupo",
+        "weight": 0.15
+      },
+      {
+        "id": "comunicacao_registro",
+        "weight": 0.15
+      }
+    ],
+    "criticalFailRules": [
+      {
+        "id": "cf_01",
+        "when": "choice",
+        "choiceId": "c_cmd_only",
+        "reason": "Controle por comando não é isolamento positivo."
+      },
+      {
+        "id": "cf_02",
+        "when": "choice",
+        "choiceId": "c_skip_verify",
+        "reason": "Trabalho sem teste de ausência de tensão."
+      },
+      {
+        "id": "cf_03",
+        "when": "choice",
+        "choiceId": "c_open_panel_now",
+        "reason": "Acesso ao painel sem verificação e sem controle de energia residual."
+      }
+    ]
+  },
+  "context": {
+    "site": "Planta com gerador de emergência",
+    "asset": "MCC 480V alimentando bombas e ventiladores",
+    "voltage": "480V",
+    "pressure": "Parada parcial; manutenção em janela curta",
+    "roles": [
+      "Authorized Employee",
+      "Affected Employee",
+      "Supervisor"
+    ]
+  },
+  "startNodeId": "m_intro",
+  "nodes": [
+    {
+      "id": "m_intro",
+      "type": "info",
+      "title": "Situação",
+      "body": "Você precisa substituir um contator em um bucket do MCC 480V. O MCC pode ser alimentado pela rede, por um gerador de emergência (ATS) e possui banco de capacitores em outro compartimento.",
+      "next": "m_identify_sources"
+    },
+    {
+      "id": "m_identify_sources",
+      "type": "decision",
+      "title": "Mapeamento de fontes",
+      "body": "Quais fontes devem ser consideradas para garantir energia zero no bucket e no barramento do MCC?",
+      "choices": [
+        {
+          "id": "m_only_utility",
+          "label": "Somente a alimentação da rede (alimentador principal)",
+          "effects": {
+            "scoreDelta": {
+              "isolamento_positivo": -10,
+              "energia_residual": -10
+            },
+            "flags": [
+              "missed_sources"
+            ]
+          },
+          "feedback": "Incompleto. Existe possibilidade de backfeed via gerador/ATS e energia armazenada em capacitores."
+        },
+        {
+          "id": "m_all_sources",
+          "label": "Rede + gerador via ATS/backfeed + transformador de controle + banco de capacitores",
+          "effects": {
+            "scoreDelta": {
+              "isolamento_positivo": 10,
+              "energia_residual": 10
+            },
+            "flags": [
+              "recognized_multiple_sources"
+            ]
+          },
+          "feedback": "Correto. Em MCC é comum haver múltiplas fontes e energia armazenada."
+        }
+      ],
+      "nextByChoice": {
+        "m_only_utility": "m_isolation_strategy",
+        "m_all_sources": "m_isolation_strategy"
+      }
+    },
+    {
+      "id": "m_isolation_strategy",
+      "type": "decision",
+      "title": "Estratégia de isolamento",
+      "body": "Qual estratégia você escolhe para isolar o MCC e o bucket de forma segura?",
+      "choices": [
+        {
+          "id": "m_bucket_only",
+          "label": "Desligar apenas o disjuntor do bucket e iniciar o serviço",
+          "effects": {
+            "scoreDelta": {
+              "isolamento_positivo": -15,
+              "verificacao_ausencia": -10
+            },
+            "flags": [
+              "bucket_only"
+            ]
+          },
+          "feedback": "Risco: o barramento pode permanecer energizado e a interdependência do bucket exige verificação e controle de fontes."
+        },
+        {
+          "id": "m_main_and_ats",
+          "label": "Isolar alimentador principal + bloquear ATS/gerador para impedir backfeed + isolar bucket",
+          "effects": {
+            "scoreDelta": {
+              "isolamento_positivo": 25,
+              "comunicacao_registro": 5
+            },
+            "flags": [
+              "positive_isolation"
+            ]
+          },
+          "feedback": "Adequado. Controle de fontes e prevenção de backfeed elevam a robustez do LOTO."
+        }
+      ],
+      "nextByChoice": {
+        "m_bucket_only": "m_group_lockout",
+        "m_main_and_ats": "m_group_lockout"
+      }
+    },
+    {
+      "id": "m_group_lockout",
+      "type": "decision",
+      "title": "Equipe e LOTO coletivo",
+      "body": "Há 3 pessoas envolvidas (eletricista, mecânico e líder). Como você controla o bloqueio?",
+      "choices": [
+        {
+          "id": "m_single_lock_team",
+          "label": "Um cadeado do time em cada ponto",
+          "effects": {
+            "scoreDelta": {
+              "pessoas_e_grupo": -25,
+              "comunicacao_registro": -10
+            },
+            "flags": [
+              "shared_lock"
+            ]
+          },
+          "feedback": "Fraco. O ideal é lockbox/hasp para garantir 1 pessoa/1 cadeado/1 chave."
+        },
+        {
+          "id": "m_lockbox",
+          "label": "Aplicar bloqueios nos pontos e usar lockbox (caixa de bloqueio) com cadeado individual de cada membro",
+          "effects": {
+            "scoreDelta": {
+              "pessoas_e_grupo": 25,
+              "comunicacao_registro": 10
+            },
+            "flags": [
+              "lockbox_used"
+            ]
+          },
+          "feedback": "Correto. LOTO coletivo com lockbox aumenta controle e rastreabilidade."
+        }
+      ],
+      "nextByChoice": {
+        "m_single_lock_team": "m_residual_energy",
+        "m_lockbox": "m_residual_energy"
+      }
+    },
+    {
+      "id": "m_residual_energy",
+      "type": "decision",
+      "title": "Energia armazenada",
+      "body": "O MCC possui banco de capacitores em compartimento adjacente. O que você faz antes de acessar o bucket?",
+      "choices": [
+        {
+          "id": "m_ignore_caps",
+          "label": "Ignorar; o serviço é no bucket, não no banco de capacitores",
+          "effects": {
+            "scoreDelta": {
+              "energia_residual": -25,
+              "verificacao_ausencia": -10
+            },
+            "flags": [
+              "ignored_caps"
+            ]
+          },
+          "feedback": "Risco. Energia armazenada pode permanecer no barramento e afetar o trabalho. Requer controle e verificação."
+        },
+        {
+          "id": "m_discharge_verify",
+          "label": "Isolar/garantir descarregamento conforme procedimento + verificar ausência de tensão no barramento e no bucket",
+          "effects": {
+            "scoreDelta": {
+              "energia_residual": 25,
+              "verificacao_ausencia": 25
+            },
+            "flags": [
+              "caps_handled"
+            ]
+          },
+          "feedback": "Correto. Considera energia residual e valida energia zero no ponto de trabalho e no barramento relevante."
+        }
+      ],
+      "nextByChoice": {
+        "m_ignore_caps": "m_verify_test",
+        "m_discharge_verify": "m_verify_test"
+      }
+    },
+    {
+      "id": "m_verify_test",
+      "type": "decision",
+      "title": "Verificação técnica",
+      "body": "Qual verificação você executa?",
+      "choices": [
+        {
+          "id": "m_test_on_bucket_only",
+          "label": "Testar apenas no bucket (um ponto) e seguir",
+          "effects": {
+            "scoreDelta": {
+              "verificacao_ausencia": -10
+            },
+            "flags": [
+              "limited_test"
+            ]
+          },
+          "feedback": "Parcial. Em MCC, boas práticas incluem verificar nos pontos relevantes (barramento/bucket/controle) e testar o instrumento (test-before/after)."
+        },
+        {
+          "id": "m_test_before_after_multi",
+          "label": "Testar o instrumento em fonte conhecida (antes) + verificar em múltiplos pontos relevantes + testar novamente (depois)",
+          "effects": {
+            "scoreDelta": {
+              "verificacao_ausencia": 20,
+              "comunicacao_registro": 5
+            },
+            "flags": [
+              "test_before_after"
+            ]
+          },
+          "feedback": "Correto. Aumenta confiança na verificação e reduz falsos 'zero' por instrumento defeituoso."
+        }
+      ],
+      "nextByChoice": {
+        "m_test_on_bucket_only": "m_execute_work",
+        "m_test_before_after_multi": "m_execute_work"
+      }
+    },
+    {
+      "id": "m_execute_work",
+      "type": "decision",
+      "title": "Execução do trabalho",
+      "body": "Durante a troca do contator, o supervisor pergunta se dá para remover um cadeado 'só por um minuto'. O que você faz?",
+      "choices": [
+        {
+          "id": "m_remove_for_speed",
+          "label": "Remover temporariamente para acelerar",
+          "effects": {
+            "scoreDelta": {
+              "pessoas_e_grupo": -20,
+              "comunicacao_registro": -20
+            },
+            "flags": [
+              "normalized_deviance"
+            ]
+          },
+          "feedback": "Falha de cultura/gestão. Remoção temporária normaliza desvio e aumenta risco de reenergização."
+        },
+        {
+          "id": "m_refuse_follow_process",
+          "label": "Recusar; manter lockbox e seguir o processo formal (coordenação/clearance)",
+          "effects": {
+            "scoreDelta": {
+              "pessoas_e_grupo": 10,
+              "comunicacao_registro": 15
+            },
+            "flags": [
+              "process_discipline"
+            ]
+          },
+          "feedback": "Correto. Disciplina do processo reduz risco sistêmico e protege a equipe."
+        }
+      ],
+      "nextByChoice": {
+        "m_remove_for_speed": "m_outcome_complete",
+        "m_refuse_follow_process": "m_outcome_complete"
+      }
+    },
+    {
+      "id": "m_outcome_complete",
+      "type": "outcome",
+      "title": "Resultado: Sessão concluída",
+      "body": "Sessão concluída. O sistema registrou decisões sobre múltiplas fontes, backfeed, lockbox e verificação.",
+      "outcome": {
+        "status": "COMPLETED",
+        "severity": "NONE"
+      }
+    }
+  ]
+}

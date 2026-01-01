@@ -1,0 +1,133 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  SUPERVISOR
+  EXECUTOR
+  VIEWER
+}
+
+enum SessionStatus {
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  ABORTED
+}
+
+enum EventType {
+  SESSION_STARTED
+  NODE_VIEWED
+  CHOICE_SELECTED
+  STATE_UPDATED
+  RULE_TRIGGERED
+  SESSION_COMPLETED
+  SESSION_ABORTED
+}
+
+model Org {
+  id        String   @id @default(uuid())
+  name      String
+  plan      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users     User[]
+  scenarios Scenario[]
+  sessions  Session[]
+
+  @@index([name])
+}
+
+model User {
+  id           String   @id @default(uuid())
+  orgId        String?
+  org          Org?     @relation(fields: [orgId], references: [id], onDelete: SetNull)
+
+  email        String   @unique
+  name         String?
+  passwordHash String
+  role         UserRole @default(EXECUTOR)
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  sessions     Session[]
+}
+
+model Scenario {
+  id         String   @id @default(uuid())
+  orgId      String?
+  org        Org?     @relation(fields: [orgId], references: [id], onDelete: SetNull)
+
+  scenarioId String
+  version    String
+  title      String
+  active     Boolean  @default(true)
+  json       Json
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  sessions   Session[]
+
+  @@unique([orgId, scenarioId, version])
+  @@index([scenarioId, version])
+  @@index([active])
+}
+
+model Session {
+  id              String        @id @default(uuid())
+  orgId           String?
+  org             Org?          @relation(fields: [orgId], references: [id], onDelete: SetNull)
+
+  userId          String
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  scenarioId      String
+  scenarioVersion String
+  scenarioDbId    String?
+  scenarioDb      Scenario?     @relation(fields: [scenarioDbId], references: [id], onDelete: SetNull)
+
+  status          SessionStatus @default(IN_PROGRESS)
+  startedAt       DateTime      @default(now())
+  endedAt         DateTime?
+
+  overallScore    Int?
+  maturityLevel   String?
+  dimensionScores Json?
+  criticalFails   Json?
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  events          Event[]
+
+  @@index([userId, startedAt])
+  @@index([scenarioId, scenarioVersion])
+  @@index([status])
+}
+
+model Event {
+  id            String   @id @default(uuid())
+
+  sessionId     String
+  session       Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  clientEventId String
+  ts            DateTime
+  type          EventType
+  payload       Json
+
+  createdAt     DateTime @default(now())
+
+  @@unique([sessionId, clientEventId])
+  @@index([sessionId, ts])
+  @@index([type])
+}
