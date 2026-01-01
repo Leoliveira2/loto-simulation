@@ -1,11 +1,24 @@
 {
   "name": "loto-sim-platform",
+  "version": "1.0.0",
   "private": true,
   "packageManager": "pnpm@9.12.2",
   "scripts": {
-    "dev": "pnpm -r dev",
+    "dev": "pnpm -r --parallel dev",
     "dev:api": "pnpm --filter api dev",
     "dev:web": "pnpm --filter web dev",
-    "lint": "echo \"Add lint later\""
+    "build": "pnpm -r build",
+    "build:api": "pnpm --filter api build",
+    "build:web": "pnpm --filter web build",
+    "start:api": "pnpm --filter api start",
+    "start:web": "pnpm --filter web start",
+    "prisma:generate": "pnpm --filter api prisma:generate",
+    "prisma:migrate": "pnpm --filter api prisma:migrate",
+    "lint": "echo \"Add lint later\"",
+    "clean": "pnpm -r exec rm -rf dist .next node_modules"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=9.0.0"
   }
 }
