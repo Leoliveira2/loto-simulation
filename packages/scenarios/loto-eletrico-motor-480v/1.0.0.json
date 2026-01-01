@@ -1,0 +1,30 @@
+{
+  "scenarioId": "loto-eletrico-motor-480v",
+  "version": "1.0.0",
+  "title": "LOTO Elétrico – Motor 480V com inversor",
+  "startNodeId": "n_intro",
+  "maturityModel": {
+    "levels": [
+      { "id": "iniciante", "minScore": 0, "maxScore": 49 },
+      { "id": "experiente", "minScore": 50, "maxScore": 79 },
+      { "id": "sistemico", "minScore": 80, "maxScore": 100 }
+    ],
+    "dimensions": [
+      { "id": "isolamento_positivo", "weight": 0.25 },
+      { "id": "verificacao_ausencia", "weight": 0.25 },
+      { "id": "energia_residual", "weight": 0.2 },
+      { "id": "pessoas_e_grupo", "weight": 0.15 },
+      { "id": "comunicacao_registro", "weight": 0.15 }
+    ],
+    "criticalFailRules": []
+  },
+  "nodes": [
+    {
+      "id": "n_intro",
+      "type": "outcome",
+      "title": "Cenário carregado",
+      "body": "Este é um cenário de teste inicial.",
+      "outcome": { "status": "COMPLETED", "severity": "NONE" }
+    }
+  ]
+}

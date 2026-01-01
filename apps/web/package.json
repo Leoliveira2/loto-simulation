@@ -1,0 +1,7 @@
+{
+  "name": "web",
+  "private": true,
+  "scripts": {
+    "dev": "echo \"Run Next.js dev here\""
+  }
+}
